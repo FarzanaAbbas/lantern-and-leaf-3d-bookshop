@@ -32,6 +32,7 @@ const mat = {
   pot: new THREE.MeshStandardMaterial({ color: '#b5653f', roughness: 0.9 }),
   leaf: new THREE.MeshStandardMaterial({ color: '#3f7d4a', roughness: 0.8, flatShading: true }),
   paper: new THREE.MeshStandardMaterial({ color: '#f4ecdc', roughness: 0.9 }),
+  kraft: new THREE.MeshStandardMaterial({ color: '#c49a6c', roughness: 0.95 }),
 }
 const box = new THREE.BoxGeometry(1, 1, 1)
 
@@ -59,6 +60,7 @@ function CameraRig() {
       nudge(e.deltaY * 0.006)
     }
     const onKey = (down) => (e) => {
+      if (down && e.target instanceof Element && e.target.closest('input, textarea, select')) return
       keys.current[e.key.toLowerCase()] = down
     }
     const onMove = (e) => {
@@ -458,16 +460,83 @@ function DisplayTable({ position, seed }) {
   )
 }
 
-function Checkout({ ready }) {
+function PaySign({ ready, position }) {
+  const tex = useMemo(() => (ready ? signTexture('Pay here', 'Click the counter', { bg: '#e3a33b', fg: '#2a1c08', accent: '#1d2a22' }) : null), [ready])
+  return (
+    <group position={position} rotation={[-0.15, -0.25, 0]}>
+      <mesh position={[0, 0.13, 0]}>
+        <planeGeometry args={[0.6, 0.19]} />
+        {/* keyed so the shader is rebuilt once the font-dependent texture exists */}
+        <meshStandardMaterial
+          key={tex ? 'tex' : 'plain'}
+          map={tex}
+          color={tex ? '#fff' : '#e3a33b'}
+          emissive={tex ? '#ffffff' : '#000000'}
+          emissiveMap={tex}
+          emissiveIntensity={0.25}
+        />
+      </mesh>
+      <Box s={[0.62, 0.21, 0.02]} p={[0, 0.13, -0.012]} m={mat.walnutDark} />
+      <Box s={[0.2, 0.02, 0.12]} p={[0, 0.01, -0.03]} m={mat.walnutDark} />
+    </group>
+  )
+}
+
+// A kraft paper bag, one per order placed, lined up on the counter.
+function PaperBag({ position, color }) {
+  const ref = useRef()
+  useLayoutEffect(() => {
+    ref.current.scale.setScalar(0.01)
+  }, [])
+  useFrame((_, dt) => {
+    const s = damp(ref.current.scale.x, 1, 8, Math.min(dt, 0.05))
+    ref.current.scale.setScalar(s)
+  })
+  return (
+    <group ref={ref} position={position}>
+      <Box s={[0.3, 0.36, 0.18]} p={[0, 0.18, 0]} m={mat.kraft} />
+      <Box s={[0.2, 0.05, 0.01]} p={[0, 0.39, 0]} m={mat.kraft} />
+      <Box s={[0.1, 0.1, 0.005]} p={[0, 0.2, 0.093]} m={new THREE.MeshStandardMaterial({ color })} />
+    </group>
+  )
+}
+
+function Checkout({ ready, onCounter, orders }) {
   const z = CHECKOUT_Z
+  const [hot, setHot] = useState(false)
+  const registerMat = useMemo(() => mat.green.clone(), [])
+  useEffect(() => {
+    registerMat.emissive.set(hot ? '#e3a33b' : '#000000')
+    registerMat.emissiveIntensity = hot ? 0.5 : 0
+  }, [hot, registerMat])
   return (
     <group>
-      <Box s={[2.2, 1.0, 0.7]} p={[1.6, 0.5, z - 0.8]} m={mat.walnut} />
-      <Box s={[2.3, 0.05, 0.8]} p={[1.6, 1.02, z - 0.8]} m={mat.oak} />
-      <Box s={[0.36, 0.22, 0.3]} p={[1.9, 1.16, z - 0.85]} r={[0, -0.3, 0]} m={mat.green} />
-      <Box s={[0.3, 0.02, 0.2]} p={[1.9, 1.29, z - 0.9]} r={[-0.5, -0.3, 0]} m={mat.brass} />
-      <BookStack position={[1.1, 1.045, z - 0.75]} seed={42} count={5} />
-      <Box s={[0.25, 0.32, 0.01]} p={[1.45, 1.2, z - 0.95]} r={[0, 0, 0]} m={mat.paper} />
+      <group
+        onPointerOver={(e) => {
+          e.stopPropagation()
+          if (!rig.enabled) return
+          setHot(true)
+          document.body.style.cursor = 'pointer'
+        }}
+        onPointerOut={() => {
+          setHot(false)
+          document.body.style.cursor = ''
+        }}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (rig.enabled) onCounter()
+        }}
+      >
+        <Box s={[2.2, 1.0, 0.7]} p={[1.6, 0.5, z - 0.8]} m={mat.walnut} />
+        <Box s={[2.3, 0.05, 0.8]} p={[1.6, 1.02, z - 0.8]} m={mat.oak} />
+        <Box s={[0.36, 0.22, 0.3]} p={[1.9, 1.16, z - 0.85]} r={[0, -0.3, 0]} m={registerMat} />
+        <Box s={[0.3, 0.02, 0.2]} p={[1.9, 1.29, z - 0.9]} r={[-0.5, -0.3, 0]} m={mat.brass} />
+        <PaySign ready={ready} position={[1.35, 1.045, z - 0.55]} />
+      </group>
+      {orders.slice(-4).map((o, k) => (
+        <PaperBag key={o.id} position={[0.75 + k * 0.34, 1.045, z - 0.85]} color={o.color} />
+      ))}
+      <BookStack position={[2.35, 1.045, z - 0.75]} seed={42} count={5} />
       {/* reading nook */}
       <group position={[-1.9, 0, z - 1.2]} rotation={[0, 0.5, 0]}>
         <Box s={[0.9, 0.42, 0.85]} p={[0, 0.21, 0]} m={new THREE.MeshStandardMaterial({ color: '#7a2e2a', roughness: 0.9 })} />
@@ -552,7 +621,7 @@ function Trolley({ items }) {
 
 /* ------------------------------------------------------------------ */
 
-export default function Store({ selected, onSelect, cart }) {
+export default function Store({ selected, onSelect, cart, onCounter, orders }) {
   const [ready, setReady] = useState(false)
   useEffect(() => {
     fontsReady().then(() => setReady(true))
@@ -580,7 +649,7 @@ export default function Store({ selected, onSelect, cart }) {
       {SECTIONS.map((s, i) => (
         <Section key={s.id} i={i} ready={ready} selected={selected} onSelect={onSelect} />
       ))}
-      <Checkout ready={ready} />
+      <Checkout ready={ready} onCounter={onCounter} orders={orders} />
       <Trolley items={cart} />
     </>
   )

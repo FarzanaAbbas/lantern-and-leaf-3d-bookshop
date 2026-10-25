@@ -3,8 +3,8 @@ import { motion } from 'motion/react'
 import { SECTIONS, END_T, sectionT } from '../data'
 import { rig } from '../scene/rig'
 
-const ease = [0.22, 1, 0.36, 1]
-const rupees = (n) => `₹${n.toLocaleString('en-IN')}`
+export const ease = [0.22, 1, 0.36, 1]
+export const rupees = (n) => `₹${n.toLocaleString('en-IN')}`
 
 export const STATIONS = [
   { id: 'entrance', label: 'Entrance', t: 0 },
@@ -12,7 +12,7 @@ export const STATIONS = [
   { id: 'checkout', label: 'Checkout', t: END_T },
 ]
 
-function useActiveStation() {
+export function useActiveStation() {
   const [active, setActive] = useState(0)
   useEffect(() => {
     let raf
@@ -170,7 +170,7 @@ function inkFor(hex) {
   return l > 0.6 ? '#1b1b1b' : '#f7f0e2'
 }
 
-function Cover({ book, small }) {
+export function Cover({ book, small }) {
   return (
     <div className={`cover ${small ? 'small' : ''}`} style={{ background: book.color, color: inkFor(book.color) }}>
       {book.band && <span className="cover-band" style={{ background: book.band }} />}

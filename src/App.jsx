@@ -5,6 +5,7 @@ import Store from './scene/Store'
 import { rig, walkTo } from './scene/rig'
 import { END_T, sectionT } from './data'
 import { Navbar, Intro, BookCard, CartDrawer, WalkBar, Toast } from './ui/Overlay'
+import { CheckoutPanel, CounterPrompt } from './ui/Checkout'
 
 export default function App() {
   const [entered, setEntered] = useState(false)
@@ -12,6 +13,8 @@ export default function App() {
   const [cart, setCart] = useState([])
   const [cartOpen, setCartOpen] = useState(false)
   const [toast, setToast] = useState(null)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [orders, setOrders] = useState([])
 
   const closeBook = useCallback(() => {
     if (rig.focus) rig.target = rig.focus.t
@@ -24,6 +27,7 @@ export default function App() {
       if (e.key === 'Escape') {
         closeBook()
         setCartOpen(false)
+        setCheckoutOpen(false)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -73,8 +77,35 @@ export default function App() {
 
   const checkout = () => {
     goTo(END_T)
-    setToast('This is a demo shop — no payment is taken')
+    setCheckoutOpen(true)
   }
+
+  const openCounter = () => {
+    closeBook()
+    setCartOpen(false)
+    setCheckoutOpen(true)
+  }
+
+  const placeOrder = ({ method, name, total, lines }) => {
+    const order = {
+      id: `LL-${Math.floor(1000 + Math.random() * 9000)}`,
+      method,
+      name,
+      total,
+      lines,
+      color: lines[0]?.color || '#e3a33b',
+    }
+    setOrders((o) => [...o, order])
+    setCart([])
+    return order
+  }
+
+  const keepBrowsing = () => {
+    setCheckoutOpen(false)
+    walkTo(sectionT(0))
+  }
+
+  const cartTotal = cart.reduce((s, x) => s + x.price, 0)
 
   return (
     <>
@@ -86,7 +117,7 @@ export default function App() {
           onPointerMissed={() => selected && closeBook()}
         >
           <Suspense fallback={null}>
-            <Store selected={selected} onSelect={setSelected} cart={cart} />
+            <Store selected={selected} onSelect={setSelected} cart={cart} onCounter={openCounter} orders={orders} />
           </Suspense>
         </Canvas>
       </div>
@@ -97,6 +128,15 @@ export default function App() {
         <>
           <Navbar cartCount={cart.length} onCart={() => setCartOpen(true)} onGo={goTo} />
           <WalkBar onGo={goTo} />
+          {!checkoutOpen && !cartOpen && (
+            <CounterPrompt
+              cartCount={cart.length}
+              total={cartTotal}
+              lastOrder={orders[orders.length - 1]}
+              onPay={openCounter}
+              onBrowse={keepBrowsing}
+            />
+          )}
         </>
       )}
 
@@ -106,6 +146,17 @@ export default function App() {
       <AnimatePresence>
         {cartOpen && (
           <CartDrawer key="cart" cart={cart} onClose={() => setCartOpen(false)} onRemove={removeOne} onCheckout={checkout} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {checkoutOpen && (
+          <CheckoutPanel
+            key="checkout"
+            cart={cart}
+            onClose={() => setCheckoutOpen(false)}
+            onPlace={placeOrder}
+            onKeepBrowsing={keepBrowsing}
+          />
         )}
       </AnimatePresence>
       <AnimatePresence>{toast && <Toast key={toast} text={toast} />}</AnimatePresence>
